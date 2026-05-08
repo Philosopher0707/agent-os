@@ -59,6 +59,7 @@ class BdiReasoningEngineTest {
         engine.goals(agent).addAchievementGoal(Literal.of("handle_alert", "payment"));
 
         engine.step(agent);
+        engine.processSync(agent);
         assertThat(ctx.sentMessages).hasSize(1);
         assertThat(ctx.sentMessages.get(0).performative()).isEqualTo(ACLMessage.Performative.CFP);
     }

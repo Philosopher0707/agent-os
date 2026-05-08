@@ -26,7 +26,7 @@ public final class DefaultAgentKernel implements AgentKernel {
     private final AgentOsConfig config;
     private final ScheduledExecutorService scheduler;
     private final Map<AgentId, AgentSession> sessions = new ConcurrentHashMap<>();
-    private final Map<AgentId, AgentMailbox> mailboxes = new ConcurrentHashMap<>();
+    private final Map<String, AgentMailbox> mailboxes = new ConcurrentHashMap<>();
     private AgentRegistry registry;
     private ServiceDirectory serviceDir;
     private MessageTransport transport;
@@ -301,7 +301,7 @@ public final class DefaultAgentKernel implements AgentKernel {
             }
         };
         AgentMailbox mailbox = new AgentMailbox(config.mailboxCapacity(), dispatcher);
-        mailboxes.put(id, mailbox);
+        mailboxes.put(id.name(), mailbox);
 
         ReasoningEngine engine = findEngine(agent);
         if (engine != null) {
@@ -324,7 +324,7 @@ public final class DefaultAgentKernel implements AgentKernel {
         } catch (Exception e) {
             log.warn("Agent {} init failed: {}", id.name(), e.getMessage());
             sessions.remove(id);
-            mailboxes.remove(id);
+            mailboxes.remove(id.name());
             routingCache.invalidate(id.name());
             if (registry != null) {
                 registry.unregister(id);
@@ -348,7 +348,7 @@ public final class DefaultAgentKernel implements AgentKernel {
         AgentSession session = sessions.remove(id);
         if (session != null) {
             session.shutdown();
-            mailboxes.remove(id);
+            mailboxes.remove(id.name());
             routingCache.invalidate(id.name());
             if (registry != null) {
                 registry.unregister(id);
@@ -395,7 +395,7 @@ public final class DefaultAgentKernel implements AgentKernel {
 
         // Deliver locally and drain immediately to prevent race conditions
         for (AgentId receiver : msg.receivers()) {
-            AgentMailbox mailbox = mailboxes.get(receiver);
+            AgentMailbox mailbox = mailboxes.get(receiver.name());
             if (mailbox != null) {
                 mailbox.deliver(msg);
                 mailbox.drain(failed -> {

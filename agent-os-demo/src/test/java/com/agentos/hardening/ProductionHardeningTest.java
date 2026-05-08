@@ -715,13 +715,9 @@ class ProductionHardeningTest {
     // ═══════════════════════════════════════════════════════════════
     // TEST 16: Stress the full self-healing orchestration
     // ═══════════════════════════════════════════════════════════════
-    @Disabled("Needs deeper BDI refactoring: re-entry guard prevents concurrent healing. " +
-        "The send(CFP) triggers PROPOSE inside same call stack, and chain execution " +
-        "within executePlan creates complex re-entrancy. Fix requires event-driven goal " +
-        "processing decoupled from synchronous message dispatch.")
     @Test
     @Order(16)
-    @DisplayName("Self-healing should work with BDI chain execution")
+    @DisplayName("Self-healing should work with BDI concurrent execution")
     void concurrentFaultHealing() throws Exception {
         // Fully self-contained — no @BeforeEach kernel interference
         var bdi = new BdiReasoningEngine();

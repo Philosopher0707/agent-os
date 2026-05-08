@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 
 public final class BdiReasoningEngine implements ReasoningEngine {
     private static final Logger log = LoggerFactory.getLogger(BdiReasoningEngine.class);
@@ -17,7 +18,7 @@ public final class BdiReasoningEngine implements ReasoningEngine {
     private final Map<Agent, BuiltinActions> builtins = new ConcurrentHashMap<>();
     private final Map<Agent, AgentContext> contexts = new ConcurrentHashMap<>();
     private final Set<Agent> bdiAgents = ConcurrentHashMap.newKeySet();
-    private final Set<Agent> processing = ConcurrentHashMap.newKeySet();
+    private final Set<Agent> inQueue = ConcurrentHashMap.newKeySet();
     private final Map<Agent, Literal> activeGoal = new ConcurrentHashMap<>(); // tracks goal for current plan
 
     @Override public String name() { return "bdi"; }
@@ -91,13 +92,40 @@ public final class BdiReasoningEngine implements ReasoningEngine {
             bb.add(Literal.of("proposal_refused", msg.sender().name()));
         }
 
-        // Process intentions with re-entry guard to prevent recursive loops
-        if (processing.add(agent)) {
-            try {
-                processIntentions(agent);
-            } finally {
-                processing.remove(agent);
-            }
+        GoalBase gb = goalBases.get(agent);
+        // Schedule intention processing asynchronously — decoupled from message delivery
+        scheduleProcessing(agent);
+    }
+
+    /** Synchronous processing for tests — bypasses the async queue */
+    void processSync(Agent agent) {
+        synchronized (agent) {
+            processIntentions(agent);
+        }
+    }
+    private void scheduleProcessing(Agent agent) {
+        boolean added = inQueue.add(agent);
+        if (added) {
+            System.out.println("BDI scheduleProcessing " + agent.agentId().name() + " task submitted");
+            ForkJoinPool.commonPool().submit(() -> {
+                try {
+                    synchronized (agent) {
+                        processIntentions(agent);
+                    }
+                } finally {
+                    inQueue.remove(agent);
+                    // If new goals arrived during processing, schedule again
+                    GoalBase gb = goalBases.get(agent);
+                    IntentionStack stack = intentions.get(agent);
+                    if (gb != null && stack != null && !stack.isEmpty()) {
+                        // There's still an active intention — continue immediately
+                        scheduleProcessing(agent);
+                    } else if (gb != null && !gb.pendingAchievementGoals().isEmpty()) {
+                        // New goals arrived
+                        scheduleProcessing(agent);
+                    }
+                }
+            });
         }
     }
 
@@ -105,13 +133,7 @@ public final class BdiReasoningEngine implements ReasoningEngine {
     public void step(Agent agent) {
         // Process maintenance goals on each tick
         processMaintenanceGoals(agent);
-        if (processing.add(agent)) {
-            try {
-                processIntentions(agent);
-            } finally {
-                processing.remove(agent);
-            }
-        }
+        scheduleProcessing(agent);
     }
 
     /** Process the intention stack — continue executing the current intention */
