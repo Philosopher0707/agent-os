@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":agent-os-directory"))
     implementation(project(":agent-os-messaging"))
     implementation(project(":agent-os-reasoning-reactive"))
+    implementation(project(":agent-os-transport-websocket"))
     implementation(project(":agent-os-reasoning-bdi"))
     implementation("org.slf4j:slf4j-api:$slf4jVersion")
     implementation("ch.qos.logback:logback-classic:$logbackVersion")

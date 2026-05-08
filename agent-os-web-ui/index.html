@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent OS Dashboard</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8;
+    --accent: #38bdf8; --success: #22c55e; --warn: #eab308; --danger: #ef4444;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    padding: 1.5rem 2rem; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  header h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 0.5rem; }
+  header .badge {
+    background: var(--accent); color: #000; font-size: 0.75rem; padding: 0.25rem 0.75rem;
+    border-radius: 999px; font-weight: 600;
+  }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding: 1.5rem 2rem;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+  .card h3 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); margin-bottom: 0.75rem;
+  }
+  .metric { display: flex; justify-content: space-between; margin: 0.4rem 0; }
+  .metric span:first-child { color: var(--muted); font-size: 0.875rem; }
+  .metric span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .agent-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .agent-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03);
+    border-radius: 0.375rem; border: 1px solid transparent;
+  }
+  .agent-row:hover { border-color: var(--border); }
+  .state { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px;
+    font-weight: 600; text-transform: uppercase;
+  }
+  .state.ACTIVE { background: rgba(34,197,94,0.15); color: var(--success); }
+  .state.SUSPENDED { background: rgba(234,179,8,0.15); color: var(--warn); }
+  .state.TERMINATED { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .msg-stream {
+    height: 280px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.8rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;
+    padding: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;
+  }
+  .msg { padding: 0.35rem 0.5rem; border-radius: 0.25rem; border-left: 3px solid var(--accent);
+    background: rgba(56,189,248,0.05);
+  }
+  .msg.CFP { border-color: var(--warn); background: rgba(234,179,8,0.05); }
+  .msg.PROPOSE { border-color: var(--accent); background: rgba(56,189,248,0.05); }
+  .msg.ACCEPT_PROPOSAL { border-color: var(--success); background: rgba(34,197,94,0.05); }
+  .msg.INFORM { border-color: var(--success); background: rgba(34,197,94,0.05); }
+  .msg.FAILURE { border-color: var(--danger); background: rgba(239,68,68,0.05); }
+  .msg .perf { font-weight: 700; color: var(--accent); }
+  .msg.CFP .perf { color: var(--warn); }
+  .msg.ACCEPT_PROPOSAL .perf, .msg.INFORM .perf { color: var(--success); }
+  .msg.FAILURE .perf { color: var(--danger); }
+  .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  button {
+    background: var(--accent); color: #000; border: none; padding: 0.5rem 1rem;
+    border-radius: 0.375rem; font-weight: 600; cursor: pointer; font-size: 0.875rem;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: var(--border); color: var(--text); }
+  .status-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; padding: 0.5rem 2rem;
+    background: var(--card); border-top: 1px solid var(--border);
+    font-size: 0.8rem; display: flex; justify-content: space-between; color: var(--muted);
+  }
+  #toast {
+    position: fixed; top: 1rem; right: 1rem; background: var(--card);
+    border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.5rem;
+    font-size: 0.875rem; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    z-index: 100;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 Agent OS <span class="badge">LIVE</span></h1>
+  <div id="conn-status" style="font-size:0.875rem;color:var(--muted)">Connecting…</div>
+</header>
+
+<div class="grid">
+  <!-- Kernel Health -->
+  <div class="card">
+    <h3>Kernel Health</h3>
+    <div class="metric"><span>Container</span><span id="k-container">—</span></div>
+    <div class="metric"><span>Active Agents</span><span id="k-active">—</span></div>
+    <div class="metric"><span>Suspended</span><span id="k-suspended">—</span></div>
+    <div class="metric"><span>Terminated</span><span id="k-terminated">—</span></div>
+    <div class="metric"><span>Messages Routed</span><span id="k-routed">—</span></div>
+    <div class="metric"><span>Messages Failed</span><span id="k-failed">—</span></div>
+  </div>
+
+  <!-- Agent List -->
+  <div class="card">
+    <h3>Agents</h3>
+    <div class="agent-list" id="agents">Loading…</div>
+    <div class="controls">
+      <button onclick="injectFault('crash')">💥 Crash Payment</button>
+      <button onclick="injectFault('hang')" class="secondary">⏸ Hang</button>
+      <button onclick="sendCfp()" class="secondary">📨 Send CFP</button>
+      <button onclick="clearMessages()" class="secondary">Clear</button>
+    </div>
+  </div>
+
+  <!-- Message Stream -->
+  <div class="card" style="grid-column:1/-1;">
+    <h3>ACL Message Stream</h3>
+    <div class="msg-stream" id="msg-stream">Waiting for messages…</div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="ws-status">WebSocket: disconnected</span>
+  <span id="poll-status">Polling: idle</span>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── Config ───
+const MGMT_URL = 'http://localhost:9091';
+const WS_URL   = 'ws://localhost:9092/ws?agentId=web-dashboard';
+
+// ─── State ───
+const agents = new Map();
+let ws = null;
+let pollTimer = null;
+
+// ─── Toast ───
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── WS ───
+function connectWs() {
+  const status = document.getElementById('ws-status');
+  try {
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      status.textContent = 'WebSocket: connected';
+      status.style.color = 'var(--success)';
+      document.getElementById('conn-status').textContent = 'LIVE';
+      document.getElementById('conn-status').style.color = 'var(--success)';
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        appendMessage(msg);
+        // Track agents from message traffic
+        trackAgent(msg.sender?.name, 'ACTIVE');
+        (msg.receivers || []).forEach(r => trackAgent(r.name, 'ACTIVE'));
+      } catch (e) { console.warn('Bad WS msg', ev.data); }
+    };
+    ws.onclose = () => {
+      status.textContent = 'WebSocket: disconnected — retrying…';
+      status.style.color = 'var(--danger)';
+      setTimeout(connectWs, 3000);
+    };
+    ws.onerror = () => {
+      status.textContent = 'WebSocket: error';
+      status.style.color = 'var(--danger)';
+    };
+  } catch (e) {
+    status.textContent = 'WebSocket: ' + e.message;
+    setTimeout(connectWs, 3000);
+  }
+}
+
+// ─── Polling ───
+async function pollHealth() {
+  const status = document.getElementById('poll-status');
+  try {
+    const res = await fetch(MGMT_URL + '/health');
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    document.getElementById('k-container').textContent   = data.container || '—';
+    document.getElementById('k-active').textContent      = data.activeAgents ?? '—';
+    document.getElementById('k-suspended').textContent   = data.suspendedAgents ?? '—';
+    document.getElementById('k-terminated').textContent    = data.terminatedAgents ?? '—';
+    document.getElementById('k-routed').textContent      = data.messagesRouted ?? '—';
+    document.getElementById('k-failed').textContent      = data.messagesFailed ?? '—';
+    status.textContent = 'Polling: ' + new Date().toLocaleTimeString();
+    status.style.color = 'var(--muted)';
+  } catch (e) {
+    status.textContent = 'Polling: error (' + e.message + ')';
+    status.style.color = 'var(--danger)';
+  }
+}
+
+async function pollAgents() {
+  try {
+    const res = await fetch(MGMT_URL + '/agents');
+    if (!res.ok) return;
+    const data = await res.json();
+    // For now we don't get per-agent details from /agents, so rely on traffic
+  } catch (e) {}
+}
+
+// ─── Agent tracking ───
+function trackAgent(name, state) {
+  if (!name) return;
+  agents.set(name, { name, state, lastSeen: Date.now() });
+  renderAgents();
+}
+
+function renderAgents() {
+  const list = document.getElementById('agents');
+  if (agents.size === 0) { list.innerHTML = '<div style="color:var(--muted)">No agents seen yet…</div>'; return; }
+  list.innerHTML = '';
+  for (const [name, info] of agents) {
+    const row = document.createElement('div');
+    row.className = 'agent-row';
+    row.innerHTML = `<span>${escapeHtml(name)}</span><span class="state ${info.state}">${info.state}</span>`;
+    list.appendChild(row);
+  }
+}
+
+// ─── Message stream ───
+let msgCount = 0;
+function appendMessage(msg) {
+  const stream = document.getElementById('msg-stream');
+  if (msgCount === 0) stream.innerHTML = '';
+  msgCount++;
+
+  const el = document.createElement('div');
+  el.className = 'msg ' + msg.performative;
+  const sender = msg.sender?.name || '?';
+  const recvs = (msg.receivers || []).map(r => r.name).join(', ');
+  const content = truncate(msg.content || '', 80);
+  el.innerHTML = `<span class="perf">${msg.performative}</span> ` +
+    `<b>${escapeHtml(sender)}</b> → <b>${escapeHtml(recvs)}</b>` +
+    (content ? `: ${escapeHtml(content)}` : '');
+  stream.prepend(el);
+  // Keep last 100 messages
+  while (stream.children.length > 100) stream.lastChild.remove();
+}
+
+function clearMessages() {
+  document.getElementById('msg-stream').innerHTML = 'Cleared. Waiting for messages…';
+  msgCount = 0;
+}
+
+// ─── Actions ───
+async function injectFault(type) {
+  try {
+    const res = await fetch(MGMT_URL + '/inject-fault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'payment-service', type })
+    });
+    toast(type + ' fault injected: ' + (await res.text()));
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+async function sendCfp() {
+  try {
+    const res = await fetch(MGMT_URL + '/inject-fault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'payment-service', type: 'slow' })
+    });
+    toast('Slow fault injected (simulates CFP negotiation load)');
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+// ─── Helpers ───
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+// ─── Init ───
+connectWs();
+pollHealth(); pollAgents();
+pollTimer = setInterval(() => { pollHealth(); pollAgents(); }, 2000);
+</script>
+</body>
+</html>

@@ -321,6 +321,9 @@ public final class KernelManagement implements AutoCloseable {
         try {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
             exchange.sendResponseHeaders(code, bytes.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(bytes);

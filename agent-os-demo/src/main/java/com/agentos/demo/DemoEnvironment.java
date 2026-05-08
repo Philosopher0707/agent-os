@@ -6,6 +6,7 @@ import com.agentos.directory.*;
 import com.agentos.messaging.*;
 import com.agentos.reasoning.reactive.*;
 import com.agentos.reasoning.bdi.*;
+import com.agentos.transport.websocket.WebSocketMessageTransport;
 import java.time.Duration;
 import java.util.*;
 
@@ -13,6 +14,8 @@ public class DemoEnvironment implements AutoCloseable {
     private final AgentKernel kernel;
     private final ReactiveReasoningEngine reactiveEngine;
     private final BdiReasoningEngine bdiEngine;
+    private final WebSocketMessageTransport wsTransport;
+    private final int mgmtPort;
     private final Map<String, SimulatedService> services = new LinkedHashMap<>();
 
     public DemoEnvironment() {
@@ -20,6 +23,7 @@ public class DemoEnvironment implements AutoCloseable {
     }
 
     public DemoEnvironment(int managementPort) {
+        this.mgmtPort = managementPort;
         reactiveEngine = new ReactiveReasoningEngine();
         bdiEngine = new BdiReasoningEngine();
         // Build kernel with custom config for port isolation
@@ -35,8 +39,15 @@ public class DemoEnvironment implements AutoCloseable {
         kernel.bind(new LocalMessageTransport());
         kernel.bind(new InMemoryAgentRegistry());
         kernel.bind(new InMemoryServiceDirectory());
+
+        // WebSocket transport for browser dashboard
+        wsTransport = new WebSocketMessageTransport(managementPort + 1, "demo");
+        kernel.bind(wsTransport);
+
         kernel.start();
     }
+
+    public int wsPort() { return wsTransport != null ? mgmtPort + 1 : -1; }
 
     public SimulatedService createService(String name) {
         var svc = new SimulatedService(name);
