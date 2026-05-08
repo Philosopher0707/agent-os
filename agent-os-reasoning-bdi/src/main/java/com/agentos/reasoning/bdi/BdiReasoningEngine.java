@@ -173,24 +173,18 @@ public final class BdiReasoningEngine implements ReasoningEngine {
             }
         }
 
-        // Pop the completed (or failed) intention
         stack.pop();
 
         if (!success) {
-            var lib = planLibraries.get(agent);
-            var bb = beliefBases.get(agent);
             GoalBase gb = goalBases.get(agent);
-            // Re-queue the goal so it can be retried with alternative plans on next cycle
             Literal goal = activeGoal.remove(agent);
             if (goal != null && gb != null) {
                 gb.addAchievementGoal(goal);
-                log.info("BDI: plan {} failed, goal {} re-queued for alternative plan retry",
+                log.info("BDI: plan {} failed, goal {} re-queued for retry",
                     plan.triggeringEvent(), goal);
-            } else {
-                log.warn("BDI: plan {} failed, no goal tracked for retry", plan.triggeringEvent());
             }
         } else {
-            activeGoal.remove(agent);  // plan succeeded, clear tracking
+            activeGoal.remove(agent);
         }
     }
 

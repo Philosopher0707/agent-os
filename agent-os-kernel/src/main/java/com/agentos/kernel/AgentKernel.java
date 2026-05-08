@@ -8,6 +8,7 @@ import com.agentos.kernel.messaging.MessagingProtocol;
 import com.agentos.kernel.persistence.MessageStore;
 import com.agentos.kernel.persistence.AgentStateStore;
 import com.agentos.kernel.reasoning.ReasoningEngine;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 public interface AgentKernel extends AutoCloseable {
@@ -18,6 +19,9 @@ public interface AgentKernel extends AutoCloseable {
     void send(ACLMessage msg);
     AgentContext contextOf(AgentId id);
     AgentKernelHealth health();
+
+    /** Get health for a specific agent. Returns empty if agent not found. */
+    Optional<AgentHealth> agentHealth(AgentId id);
 
     /**
      * Migrate a mobile agent to another container.

@@ -11,6 +11,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agentos
+          POSTGRES_USER: agentos
+          POSTGRES_PASSWORD: agentos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -21,10 +35,13 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Compile & Unit Tests
+      - name: Compile & Unit Tests (incl Postgres)
         run: |
           chmod +x gradlew
-          ./gradlew test -x :agent-os-persistence-postgres:test
+          export JAVA_HOME="${JAVA_HOME_21_X64}"
+          ./gradlew test
 
       - name: Production Hardening Tests
-        run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest"
+        run: |
+          export JAVA_HOME="${JAVA_HOME_21_X64}"
+          ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest"

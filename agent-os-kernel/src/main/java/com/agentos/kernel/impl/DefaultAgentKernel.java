@@ -8,7 +8,6 @@ import com.agentos.kernel.messaging.*;
 import com.agentos.kernel.persistence.*;
 import com.agentos.kernel.reasoning.*;
 import com.agentos.kernel.sandbox.SandboxedAgent;
-import com.agentos.kernel.sandbox.SandboxedAgent;
 import com.agentos.kernel.sandbox.SandboxPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +16,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.Optional;
+import java.time.Instant;
 
 public final class DefaultAgentKernel implements AgentKernel {
     private static final Logger log = LoggerFactory.getLogger(DefaultAgentKernel.class);
@@ -80,9 +81,10 @@ public final class DefaultAgentKernel implements AgentKernel {
 
         var propsLoader = new com.agentos.kernel.config.PropertiesConfigLoader();
         var envLoader = new com.agentos.kernel.config.EnvConfigLoader();
-        var envCfg = envLoader.load();
-        if (envCfg != null) return envCfg;
-        return propsLoader.load();
+        // Properties take priority over env for explicit overrides.
+        // Both are always non-null (return config with defaults).
+        var propsCfg = propsLoader.load();
+        return propsCfg;
     }
 
     @Override
@@ -203,7 +205,11 @@ public final class DefaultAgentKernel implements AgentKernel {
                         }
                     });
             },
-            this::send);
+            this::send,
+            name -> sessions.keySet().stream()
+                .filter(id -> id.name().equals(name))
+                .findFirst()
+                .flatMap(this::agentHealth));
         management.start();
     }
 
@@ -474,6 +480,19 @@ public final class DefaultAgentKernel implements AgentKernel {
         return new AgentKernelHealth(containerId, active, suspended, terminated,
             messagesRouted.get(), messagesFailed.get(),
             registry != null, transport != null, sandboxed, violations);
+    }
+
+    @Override
+    public Optional<AgentHealth> agentHealth(AgentId id) {
+        AgentSession session = sessions.get(id);
+        if (session == null) return Optional.empty();
+        Agent agent = session.agent();
+        boolean sandboxed = agent instanceof SandboxedAgent;
+        long violations = sandboxed ? ((SandboxedAgent) agent).violationCount() : 0;
+        boolean hasError = sandboxed && ((SandboxedAgent) agent).hasFailed();
+        return Optional.of(new AgentHealth(
+            id.name(), session.state(), session.consecutiveFailures(),
+            sandboxed, violations, hasError, Instant.now()));
     }
 
     @Override

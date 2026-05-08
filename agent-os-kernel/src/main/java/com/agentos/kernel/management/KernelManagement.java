@@ -1,6 +1,7 @@
 package com.agentos.kernel.management;
 
 import com.agentos.kernel.AgentKernelHealth;
+import com.agentos.kernel.AgentHealth;
 import com.agentos.kernel.AgentOsConfig;
 import com.agentos.kernel.auth.TokenAuth;
 import com.agentos.kernel.impl.DeadLetterQueue;
@@ -15,8 +16,10 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -33,6 +36,7 @@ public final class KernelManagement implements AutoCloseable {
     private final TokenAuth tokenAuth;
     private final java.util.function.BiConsumer<String, String> faultInjector;
     private final java.util.function.Consumer<com.agentos.kernel.messaging.ACLMessage> messageSender;
+    private final java.util.function.Function<String, Optional<AgentHealth>> agentHealthProvider;
     private volatile boolean ready = false;
 
     // Kernel-level metrics
@@ -42,19 +46,21 @@ public final class KernelManagement implements AutoCloseable {
 
     public KernelManagement(int port, Supplier<AgentKernelHealth> healthSupplier,
                              DeadLetterQueue deadLetterQueue, TokenAuth tokenAuth) {
-        this(port, healthSupplier, deadLetterQueue, tokenAuth, null, null);
+        this(port, healthSupplier, deadLetterQueue, tokenAuth, null, null, null);
     }
 
     public KernelManagement(int port, Supplier<AgentKernelHealth> healthSupplier,
                              DeadLetterQueue deadLetterQueue, TokenAuth tokenAuth,
                              java.util.function.BiConsumer<String, String> faultInjector,
-                             java.util.function.Consumer<com.agentos.kernel.messaging.ACLMessage> messageSender) {
+                             java.util.function.Consumer<com.agentos.kernel.messaging.ACLMessage> messageSender,
+                             java.util.function.Function<String, Optional<AgentHealth>> agentHealthProvider) {
         this.port = port;
         this.healthSupplier = healthSupplier;
         this.deadLetterQueue = deadLetterQueue;
         this.tokenAuth = tokenAuth;
         this.faultInjector = faultInjector;
         this.messageSender = messageSender;
+        this.agentHealthProvider = agentHealthProvider;
 
         try {
             this.server = HttpServer.create(new InetSocketAddress(port), 0);
@@ -62,8 +68,30 @@ public final class KernelManagement implements AutoCloseable {
             throw new RuntimeException("Failed to create management server", e);
         }
 
-        // --- /health ---
+        // --- /health (and /health/{agentId}) ---
         server.createContext("/health", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            // Check if this is a per-agent health request: /health/{agentId}
+            if (path.length() > "/health".length() + 1) {
+                String agentName = path.substring("/health/".length());
+                if (agentHealthProvider != null) {
+                    var agentHealth = agentHealthProvider.apply(agentName);
+                    if (agentHealth.isPresent()) {
+                        var h = agentHealth.get();
+                        String body = String.format(
+                            "{\"name\":\"%s\",\"state\":\"%s\",\"consecutiveFailures\":%d," +
+                            "\"sandboxed\":%s,\"sandboxViolations\":%d,\"hasError\":%s}\n",
+                            h.name(), h.state(), h.consecutiveFailures(),
+                            h.sandboxed(), h.sandboxViolations(), h.hasError());
+                        sendJson(exchange, 200, body);
+                    } else {
+                        sendJson(exchange, 404, "{\"error\":\"agent not found\"}");
+                    }
+                } else {
+                    sendJson(exchange, 501, "{\"error\":\"per-agent health not configured\"}");
+                }
+                return;
+            }
             var health = healthSupplier.get();
             String body = String.format(
                 "{\"status\":\"UP\",\"container\":\"%s\",\"activeAgents\":%d,\"suspendedAgents\":%d," +
