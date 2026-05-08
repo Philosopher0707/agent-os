@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile-and-test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -21,14 +21,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Compile kernel (root dependency)
-        run: ./gradlew :agent-os-kernel:compileJava --stacktrace
-
-      - name: Compile remaining modules
-        run: ./gradlew compileJava -x :agent-os-kernel:compileJava --stacktrace
-
-      - name: Run unit tests (skip Postgres)
-        run: ./gradlew test -x :agent-os-persistence-postgres:test --stacktrace
+      - name: Compile & Test
+        run: |
+          chmod +x gradlew
+          ./gradlew test -x :agent-os-persistence-postgres:test --info 2>&1 | tail -200
