@@ -20,12 +20,9 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Debug — directory test with full output
+      - name: Debug — capture compile errors
         run: |
           chmod +x gradlew
-          # First check java version
           java -version
-          # Run just directory test with full output
-          ./gradlew :agent-os-directory:test --stacktrace 2>&1 || true
-          # Show test results if they exist
-          find . -name "TEST-*.xml" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
+          ./gradlew :agent-os-directory:compileJava --stacktrace 2>&1 | tee /tmp/build.log
+          echo "=== EXIT CODE: $? ==="
