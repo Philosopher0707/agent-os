@@ -8,21 +8,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  debug:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Debug — capture compile errors
+      - name: Compile & Unit Tests
         run: |
           chmod +x gradlew
-          java -version
-          ./gradlew :agent-os-directory:compileJava --stacktrace 2>&1 | tee /tmp/build.log
-          echo "=== EXIT CODE: $? ==="
+          ./gradlew test -x :agent-os-persistence-postgres:test
+
+      - name: Production Hardening Tests
+        run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest"
