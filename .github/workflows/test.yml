@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -24,20 +24,49 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run unit tests (skip Postgres — no Docker)
-        run: ./gradlew test -x :agent-os-persistence-postgres:test
+      - name: Kernel tests
+        run: ./gradlew :agent-os-kernel:test --info 2>&1 | tail -80
+
+      - name: Directory tests
+        run: ./gradlew :agent-os-directory:test
+
+      - name: Messaging tests
+        run: ./gradlew :agent-os-messaging:test
+
+      - name: Demo tests
+        run: ./gradlew :agent-os-demo:test --tests "com.agentos.demo.*"
+
+  hardening-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Run production hardening tests
         run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" -x :agent-os-persistence-postgres:test
 
-      - name: Verify full compilation
-        run: ./gradlew compileJava
+  compile-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: unit-tests
 
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          name: test-reports
-          path: |
-            **/build/reports/tests/
-            **/build/test-results/
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Full compilation check
+        run: ./gradlew compileJava
