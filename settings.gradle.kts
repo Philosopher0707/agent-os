@@ -13,6 +13,7 @@ include(
     "agent-os-reasoning-bdi",
     "agent-os-reasoning-llm",
     "agent-os-cli",
-    "agent-os-demo"
+    "agent-os-demo",
+    "sample-ops-monitor"
 )
 include("agent-os-persistence-postgres")
