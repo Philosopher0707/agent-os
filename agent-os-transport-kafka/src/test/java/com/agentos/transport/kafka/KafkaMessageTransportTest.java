@@ -86,16 +86,22 @@ class KafkaMessageTransportTest {
     @Test
     void shouldRouteToAgentContainer() throws Exception {
         String containerA = "cA" + UUID.randomUUID().toString().substring(0, 4);
-        var transport = new KafkaMessageTransport(containerA, bootstrapServers);
+        String containerB = "cB" + UUID.randomUUID().toString().substring(0, 4);
 
-        transport.registerAgent("charlie", "target-container");
+        // Sender transport
+        var senderTransport = new KafkaMessageTransport(containerA, bootstrapServers);
+        senderTransport.registerAgent("charlie", containerB);
+        senderTransport.start();
 
+        // Receiver transport (the target container)
+        var receiverTransport = new KafkaMessageTransport(containerB, bootstrapServers);
         CountDownLatch received = new CountDownLatch(1);
-        transport.receive(msg -> {
+        receiverTransport.receive(msg -> {
             if (msg.content().contains("container-routed")) received.countDown();
         });
-        transport.start();
-        Thread.sleep(500);
+        receiverTransport.start();
+
+        Thread.sleep(800); // let consumers join groups
 
         var msg = ACLMessage.builder()
             .performative(ACLMessage.Performative.INFORM)
@@ -104,10 +110,11 @@ class KafkaMessageTransportTest {
             .content("container-routed")
             .build();
 
-        transport.send(msg).get(10, TimeUnit.SECONDS);
+        senderTransport.send(msg).get(10, TimeUnit.SECONDS);
         assertThat(received.await(10, TimeUnit.SECONDS)).isTrue();
 
-        transport.close();
+        senderTransport.close();
+        receiverTransport.close();
     }
 
     @Test
