@@ -29,7 +29,7 @@ Agent OS provides a kernel that manages agent lifecycles, FIPA-ACL message passi
 │  │              Transports                           │    │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │    │
 │  │  │  Local   │ │   gRPC   │ │      Kafka       │  │    │
-│  │  │ (in-mem) │ │ (+ TLS)  │ │   (planned)      │  │    │
+│  │  │ (in-mem) │ │ (+ TLS)  │ │ (multi-cluster)  │  │    │
 │  │  └──────────┘ └──────────┘ └──────────────────┘  │    │
 │  └──────────────────────────────────────────────────┘    │
 │  ┌──────────────────────────────────────────────────┐    │
@@ -58,15 +58,30 @@ Agent OS provides a kernel that manages agent lifecycles, FIPA-ACL message passi
 ## Quick Start
 
 ### Prerequisites
-- Java 21
-- Docker (for Postgres tests)
+- **Java 21 JDK** (not just JRE — compilation requires `javac`)
+  - macOS: `brew install openjdk@21`
+  - Ubuntu/CI: `sudo apt install temurin-21-jdk`
+- **Docker** — only needed for Postgres and Kafka tests
+
+### Set JAVA_HOME
+Gradle validates the running JVM version. Ensure `JAVA_HOME` points to JDK 21:
+
+```bash
+# macOS (Homebrew)
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+
+# Ubuntu / GitHub Actions
+export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64
+```
 
 ### Build
 ```bash
-./gradlew build -x :agent-os-persistence-postgres:test
+./gradlew build
+# Or skip Docker-dependent modules:
+./gradlew build -x :agent-os-persistence-postgres:test -x :agent-os-transport-kafka:test
 ```
 
-### Run the Demo
+### Run the Self-Healing Demo
 ```bash
 ./gradlew :agent-os-demo:run
 ```
@@ -77,6 +92,29 @@ The demo simulates a self-healing microservice system:
 3. A high-CPU fault is injected into the payment service
 4. The orchestrator detects the fault, negotiates with a service manager, and scales the service
 5. The service recovers to HEALTHY status
+
+### Open the Real-Time Dashboard
+While the demo is running:
+```bash
+open agent-os-web-ui/index.html        # macOS
+# xdg-open agent-os-web-ui/index.html  # Linux
+```
+
+The dashboard connects via WebSocket on port 9092 and polls `/health` on port 9091, showing live agents, ACL message flow, and kernel metrics.
+
+### Run the Ops Monitor Sample
+A real-world sample showing agents polling an HTTP API and remediating failures:
+```bash
+./gradlew :sample-ops-monitor:run --args="15"
+```
+
+### Use the CLI
+```bash
+./gradlew :agent-os-cli:installDist
+./agent-os-cli/build/install/agent-os-cli/bin/agentosctl health
+./agent-os-cli/build/install/agent-os-cli/bin/agentosctl metrics
+./agent-os-cli/build/install/agent-os-cli/bin/agentosctl inject-fault payment-service --type=crash
+```
 
 ### Management Endpoints
 ```
