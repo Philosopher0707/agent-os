@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  AGENTOS_MANAGEMENT_PORT: "0"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,14 +27,35 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run all unit tests
-        run: ./gradlew test -x :agent-os-persistence-postgres:test --no-daemon --continue
-
-      - name: Run hardening tests
-        run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" -x :agent-os-persistence-postgres:test --no-daemon --continue
-
-      - name: Full compile check
+      - name: Compile all modules
         run: ./gradlew compileJava --no-daemon
+
+      - name: Kernel tests
+        run: ./gradlew :agent-os-kernel:test --no-daemon -Dagentos.management.port=29091
+
+      - name: Directory tests
+        run: ./gradlew :agent-os-directory:test --no-daemon
+
+      - name: Messaging tests
+        run: ./gradlew :agent-os-messaging:test --no-daemon
+
+      - name: BDI tests
+        run: ./gradlew :agent-os-reasoning-bdi:test --no-daemon
+
+      - name: Reactive tests
+        run: ./gradlew :agent-os-reasoning-reactive:test --no-daemon
+
+      - name: LLM tests
+        run: ./gradlew :agent-os-reasoning-llm:test --no-daemon
+
+      - name: gRPC tests
+        run: ./gradlew :agent-os-transport-grpc:test --no-daemon -Dagentos.management.port=29091
+
+      - name: Demo unit tests
+        run: ./gradlew :agent-os-demo:test --tests "com.agentos.demo.*" --no-daemon -Dagentos.management.port=29091
+
+      - name: Production hardening tests
+        run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" --no-daemon -Dagentos.management.port=29091
 
       - name: Upload test reports
         if: always()
