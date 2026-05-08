@@ -8,39 +8,90 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
+  fast-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Compile & Unit Tests
+      - name: Directory + Messaging + BDI + Reactive + LLM (no servers)
         run: |
           chmod +x gradlew
-          ./gradlew test -x :agent-os-persistence-postgres:test
+          ./gradlew :agent-os-directory:test :agent-os-messaging:test :agent-os-reasoning-bdi:test :agent-os-reasoning-reactive:test :agent-os-reasoning-llm:test
+
+  kernel-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Kernel tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :agent-os-kernel:test
+
+  transport-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: fast-tests
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: gRPC tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :agent-os-transport-grpc:test
+
+  demo-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: fast-tests
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Demo unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :agent-os-demo:test --tests "com.agentos.demo.*"
 
   hardening-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: unit-tests
+    needs: demo-tests
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Production Hardening Suite
+      - name: Production hardening tests
         run: |
           chmod +x gradlew
-          ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" -x :agent-os-persistence-postgres:test
+          ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest"
