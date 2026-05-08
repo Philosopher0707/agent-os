@@ -39,7 +39,7 @@ jobs:
         run: |
           chmod +x gradlew
           export JAVA_HOME="${JAVA_HOME_21_X64}"
-          ./gradlew test
+          ./gradlew test -x :agent-os-demo:test
 
       - name: Production Hardening Tests
         run: |

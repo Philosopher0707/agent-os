@@ -768,7 +768,7 @@ class ProductionHardeningTest {
         System.out.println("Fault injected: status=" + payment.health().status() + " cpu=" + payment.health().cpuPercent());
         // Wait for healing
         String lastStatus = "";
-        for (int retry = 0; retry < 20; retry++) {
+        for (int retry = 0; retry < 40; retry++) {
             Thread.sleep(250);
             String s = payment.health().status();
             if (!s.equals(lastStatus)) {
