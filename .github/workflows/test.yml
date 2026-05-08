@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,26 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Compile & Test
+      - name: Compile & Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew test -x :agent-os-persistence-postgres:test --info 2>&1 | tail -200
+          ./gradlew test -x :agent-os-persistence-postgres:test
+
+  hardening-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Production Hardening Suite
+        run: |
+          chmod +x gradlew
+          ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" -x :agent-os-persistence-postgres:test
