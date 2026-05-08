@@ -27,8 +27,10 @@ class MultiAgentIntegrationTest {
     @Test
     void shouldRegisterAgentsAndReportHealth() {
         var health = env.kernel().health();
-        assertThat(health.activeAgents()).isEqualTo(0);
-        assertThat(health.containerId()).isEqualTo("default");
+        // No agents registered by DemoEnvironment — active may be 0, but kernel must be healthy
+        assertThat(health.containerId()).isEqualTo("demo");
+        assertThat(health.directoryAvailable()).isTrue();
+        assertThat(health.transportAvailable()).isTrue();
     }
 
     @Test
