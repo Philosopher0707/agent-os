@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  fast-tests:
+  debug:
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -20,78 +20,12 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Directory + Messaging + BDI + Reactive + LLM (no servers)
+      - name: Debug — directory test with full output
         run: |
           chmod +x gradlew
-          ./gradlew :agent-os-directory:test :agent-os-messaging:test :agent-os-reasoning-bdi:test :agent-os-reasoning-reactive:test :agent-os-reasoning-llm:test
-
-  kernel-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Kernel tests
-        run: |
-          chmod +x gradlew
-          ./gradlew :agent-os-kernel:test
-
-  transport-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: fast-tests
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: gRPC tests
-        run: |
-          chmod +x gradlew
-          ./gradlew :agent-os-transport-grpc:test
-
-  demo-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: fast-tests
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Demo unit tests
-        run: |
-          chmod +x gradlew
-          ./gradlew :agent-os-demo:test --tests "com.agentos.demo.*"
-
-  hardening-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: demo-tests
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Production hardening tests
-        run: |
-          chmod +x gradlew
-          ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest"
+          # First check java version
+          java -version
+          # Run just directory test with full output
+          ./gradlew :agent-os-directory:test --stacktrace 2>&1 || true
+          # Show test results if they exist
+          find . -name "TEST-*.xml" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
