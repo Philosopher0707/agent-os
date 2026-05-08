@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile:
+  compile-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +24,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Compile
-        run: ./gradlew compileJava --stacktrace
+      - name: Compile kernel (root dependency)
+        run: ./gradlew :agent-os-kernel:compileJava --stacktrace
 
-      - name: Run unit tests
+      - name: Compile remaining modules
+        run: ./gradlew compileJava -x :agent-os-kernel:compileJava --stacktrace
+
+      - name: Run unit tests (skip Postgres)
         run: ./gradlew test -x :agent-os-persistence-postgres:test --stacktrace
