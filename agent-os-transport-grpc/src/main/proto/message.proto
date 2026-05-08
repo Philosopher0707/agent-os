@@ -1,0 +1,28 @@
+syntax = "proto3";
+package agentos;
+
+option java_multiple_files = true;
+option java_package = "com.agentos.transport.grpc";
+
+service AgentMessaging {
+  rpc Send (AclMessageProto) returns (SendResponse);
+  rpc StreamMessages (stream AclMessageProto) returns (stream AclMessageProto);
+}
+
+message AclMessageProto {
+  string performative = 1;
+  string sender_name = 2;
+  string sender_id = 3;
+  repeated string receiver_names = 4;
+  repeated string receiver_ids = 5;
+  string reply_to_name = 6;
+  string reply_to_id = 7;
+  string conversation_id = 8;
+  string protocol = 10;
+  string language = 11;
+  string encoding = 12;
+  string content = 14;
+  int64 timestamp_epoch_millis = 15;
+}
+
+message SendResponse { bool acknowledged = 1; }

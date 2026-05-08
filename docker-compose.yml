@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  agent-os-node1:
+    build: .
+    container_name: agent-os-node1
+    ports:
+      - "9090:9090"
+      - "9091:9091"
+    environment:
+      AGENTOS_MANAGEMENT_PORT: "9091"
+      AGENTOS_CONTAINER_ID: "node1"
+    networks:
+      - agent-os-net
+
+  agent-os-node2:
+    build: .
+    container_name: agent-os-node2
+    ports:
+      - "9092:9090"
+      - "9093:9091"
+    environment:
+      AGENTOS_MANAGEMENT_PORT: "9091"
+      AGENTOS_CONTAINER_ID: "node2"
+      AGENTOS_PEERS: "node1=agent-os-node1:9090"
+    depends_on:
+      - agent-os-node1
+    networks:
+      - agent-os-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: agent-os-postgres
+    environment:
+      POSTGRES_DB: agentos
+      POSTGRES_USER: agentos
+      POSTGRES_PASSWORD: agentos
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - agent-os-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agent-os-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9094:9090"
+    networks:
+      - agent-os-net
+
+volumes:
+  pgdata:
+
+networks:
+  agent-os-net:
+    driver: bridge
