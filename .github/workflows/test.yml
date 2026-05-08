@@ -1,0 +1,43 @@
+name: Test & Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run unit tests (skip Postgres — no Docker)
+        run: ./gradlew test -x :agent-os-persistence-postgres:test
+
+      - name: Run production hardening tests
+        run: ./gradlew :agent-os-demo:test --tests "com.agentos.hardening.ProductionHardeningTest" -x :agent-os-persistence-postgres:test
+
+      - name: Verify full compilation
+        run: ./gradlew compileJava
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
