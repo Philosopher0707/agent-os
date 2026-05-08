@@ -74,6 +74,10 @@ public final class WebSocketMessageTransport implements MessageTransport {
             context.setContextPath("/");
             server.setHandler(context);
 
+            // Initialize WebSocket components for programmatic usage (Jetty 11)
+            context.addServletContainerInitializer(
+                new org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer());
+
             // Register WebSocket servlet — use inner class for transport access
             AgentWebSocketServlet servlet = new AgentWebSocketServlet();
             context.addServlet(new org.eclipse.jetty.servlet.ServletHolder(servlet), "/ws");
